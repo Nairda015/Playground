@@ -1,0 +1,21 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground", "Playground\Playground.csproj", "{5EBE97D6-46EA-4A05-A87E-EF4303D36FAD}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SF", "SF", "{BC2EB47A-6FA5-4CFA-B1D6-6620AFA14BC8}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5EBE97D6-46EA-4A05-A87E-EF4303D36FAD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5EBE97D6-46EA-4A05-A87E-EF4303D36FAD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5EBE97D6-46EA-4A05-A87E-EF4303D36FAD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5EBE97D6-46EA-4A05-A87E-EF4303D36FAD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
