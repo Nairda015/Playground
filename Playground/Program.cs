@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using EventStore.Client;
 using Playground;
-using static IdGen;
+using static Playground.IdGen;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,11 +11,11 @@ builder.Services.AddSwaggerGen(c => { c.OrderActionsBy(x => x.HttpMethod); });
 
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddEventStoreClient("connesctionString", x => 
+builder.Services.AddSingleton<InMemoryDocumentStorage>();
+builder.Services.AddEventStoreClient("esdb://localhost:2113?tls=false", x => 
 {
     
 });
-builder.Services.AddSingleton<InMemoryDocumentStorage>();
 
 
 var app = builder.Build();
@@ -28,7 +28,7 @@ app.UseRouting();
 
 app.MapGet("/api/health", () => "Playground is healthy");
 
-app.MapGet("createProduct/{name}",  (InMemoryDocumentStorage storage, string name) =>
+app.MapPost("product/{name}",  (InMemoryDocumentStorage storage, string name) =>
 {
     //sub from products
     var prodId = RandomLong();
@@ -42,54 +42,48 @@ app.MapGet("product/{productId:long}", (InMemoryDocumentStorage storage, long pr
         ? Results.Ok(product)
         : Results.NotFound());
 
-app.MapGet("addProductToShop/{productId:long}/{shopChainId:long}/{initialPrice:decimal}",
+app.MapPost("product-shop-stream/{productId:long}",
     async (EventStoreClient client,
         long productId,
-        long shopChainId,
-        decimal initialPrice,
+        ProductAddedToShop @event,
         CancellationToken cancellationToken) =>
 {
     //sub from shops
-    var @event = new ProductAddedToShop(shopChainId, initialPrice);
-
     var eventData = new EventData(
         Uuid.NewUuid(),
         "productAddedToShop",
         JsonSerializer.SerializeToUtf8Bytes(@event));
 
     var result = await client.AppendToStreamAsync(
-        $"{productId}-{shopChainId}",
+        $"{productId}-{@event.ShopChainId}",
         StreamState.NoStream,
         new[] { eventData },
         cancellationToken: cancellationToken);
     
-    return Results.Accepted();
+    return Results.Ok(result);
 });
 
-
-app.MapGet("priceChanged/{productId:long}/{shopChainId:long}/{shopId:long}/{price:decimal}",
+app.MapPut("product-shop-price/{productId:long}/{shopChainId:long}/{shopId:long}/{price:decimal}",
     async (EventStoreClient client,
-        long shopChainId,
-        long shopId,
-        decimal price,
         long productId,
+        long shopChainId,
+        ProductPriceChanged @event,
         CancellationToken cancellationToken) =>
-{
-    var @event = new ProductPriceChanged(shopId, price);
+    {
+        //sub from shops
+        var eventData = new EventData(
+            Uuid.NewUuid(),
+            "productPriceChanged",
+            JsonSerializer.SerializeToUtf8Bytes(@event));
 
-    var eventData = new EventData(
-        Uuid.NewUuid(),
-        "productPriceChanged",
-        JsonSerializer.SerializeToUtf8Bytes(@event));
-
-    var result = await client.AppendToStreamAsync(
-        $"{productId}-{shopChainId}",
-        StreamState.StreamExists,
-        new[] { eventData },
-        cancellationToken: cancellationToken);
+        var result = await client.AppendToStreamAsync(
+            $"{productId}-{shopChainId}",
+            StreamState.StreamExists,
+            new[] { eventData },
+            cancellationToken: cancellationToken);
     
-    return Results.Accepted();
-});
+        return Results.Ok(result);
+    });
 
 app.MapGet("product/{productId:long}/{shopChainId:long}",
     async (EventStoreClient store,
