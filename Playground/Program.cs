@@ -5,7 +5,8 @@ using static Playground.IdGen;
 
 var builder = WebApplication.CreateBuilder(args);
 
-//Services
+#region Configure Services
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c => { c.OrderActionsBy(x => x.HttpMethod); });
 
@@ -14,33 +15,44 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<InMemoryDocumentStorage>();
 builder.Services.AddEventStoreClient("esdb://localhost:2113?tls=false", x => 
 {
-    
+    x.DefaultDeadline = TimeSpan.FromSeconds(5);
 });
 
+#endregion
 
 var app = builder.Build();
 
+#region Configure Pipeline
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 app.UseSwagger();
 app.UseHttpsRedirection();
 app.UseRouting();
 
+#endregion
+
 app.MapGet("/api/health", () => "Playground is healthy");
+
+#region InMemoryDocumentStorage requests
 
 app.MapPost("product/{name}",  (InMemoryDocumentStorage storage, string name) =>
 {
     //sub from products
-    var prodId = RandomLong();
+    var prodId = NextId();
     var product = new Product(prodId, name, "TestCategory");
-    storage.Products.Add(prodId, product);
+    storage.SaveProduct(product);
     return Results.Created("product/{productId:long}", product);
 });
 
 app.MapGet("product/{productId:long}", (InMemoryDocumentStorage storage, long productId) =>
-        storage.Products.TryGetValue(productId, out var product)
+        storage.TryGetProduct(productId, out var product)
         ? Results.Ok(product)
         : Results.NotFound());
+
+app.MapGet("/products", (InMemoryDocumentStorage storage) =>
+    storage.GetAllProducts());
+
+#endregion
 
 app.MapPost("product-shop-stream/{productId:long}",
     async (EventStoreClient client,
@@ -63,7 +75,7 @@ app.MapPost("product-shop-stream/{productId:long}",
     return Results.Ok(result);
 });
 
-app.MapPut("product-shop-price/{productId:long}/{shopChainId:long}/{shopId:long}/{price:decimal}",
+app.MapPut("product-shop-price/{productId:long}/{shopChainId:long}",
     async (EventStoreClient client,
         long productId,
         long shopChainId,
@@ -95,7 +107,7 @@ app.MapGet("product/{productId:long}/{shopChainId:long}",
         $"{productId}-{shopChainId}",
         StreamPosition.Start,
         cancellationToken: cancellationToken);
-    
+
     await foreach (var message in product.Messages)
     {
         Console.WriteLine(message);
